@@ -1,0 +1,155 @@
+#include <PubSubClient.h>//This library provides a client for doing simple publish/subscribe messaging with a server that supports MQTT.
+#include <WiFiEspClient.h>//Works for ESP Wifi shield allowing Arduino boards to connect to the Internet
+#include <WiFiEspServer.h>//library that gets a client that is connected to the server and has data available for reading.
+#include <WiFiEsp.h>//WiFiEsp library allows an Arduino board to connect to the internet
+#include <WiFiEspUdp.h>
+#include <ArduinoJson.h>//ArduinoJson is a C++ JSON library for Arduino and IoT (Internet Of Things
+
+#include <SoftwareSerial.h>//Allows serial communication on other digital pins of the Arduino
+#include <HCSR04.h>//library that includes Ultrasonic Distance Sensor.
+//DEVICE CREDENTIALS OBTAINED FROM IBM CLOUD
+#define ORG "id6f2j"
+#define DEVICE_TYPE "servomotor"
+#define DEVICE_ID "servo"
+#define TOKEN "B6*DeAs8+!-Dz&mD3G"
+#define WIFI_AP "ACT101010226922"//Wifi ID for ESP-01 Wifi Module
+#define WIFI_PASSWORD "89193108"//Wifi's Password
+
+WiFiEspClient espClient;//Defining the usage of ESP Wifi module
+SoftwareSerial soft(2,3);// RX, TX pins on Arduino Board
+
+int status = WL_IDLE_STATUS;
+char server[] = ORG ".messaging.internetofthings.ibmcloud.com";
+char authMethod[] = "use-token-auth";
+char token[] = TOKEN;
+char clientId[] = "d:" ORG ":" DEVICE_TYPE ":" DEVICE_ID;
+
+const char publishTopic[] = "iot-2/evt/status/fmt/json";
+void callback(char* publishTopic, byte* payload, unsigned int payloadLength);
+
+PubSubClient client(server, 1883, callback, espClient);//Client:IBM Address
+
+int publishInterval = 3000; // 30 seconds
+long lastPublishMillis;
+
+HCSR04 hc(6,7);//Defining pins for Trigger and Echo Pins of Ultrasonic Sensor
+void setup() {
+Serial.begin(115200);//for ESP-Wifi Module
+InitWiFi();
+Serial.print(WiFi.localIP());
+if (!!!client.connected())//condition to check Wifi connection
+{Serial.print("Reconnecting client to ");
+Serial.println(server);
+while(!!!client.connect(clientId, authMethod, token)) {
+Serial.print(".");
+//delay(500);
+
+Serial.begin(9600);//for Ultrasonic Sensor
+}
+Serial.println();
+}
+}
+
+
+void setup()
+{
+ 
+Serial.begin(115200);//for ESP-Wifi Module
+InitWiFi();
+Serial.print(WiFi.localIP());
+if (!!!client.connected())//Checking for Wifi-Connection
+{Serial.print("Reconnecting client to ");
+Serial.println(server);
+while(!!!client.connect(clientId, authMethod, token)) {
+Serial.print(".");
+//delay(500);
+
+Serial.begin(9600);//For Ultrasound Sensor
+}
+Serial.println();
+}
+}
+void loop()
+{
+  String payload = "{\"d\":";//for Publishing in the Recent events of Connected Device
+  if(hc.dist()>60)//condition if distance is greater than 60cm
+  {
+    payload += hc.dist();//hc.dist()-keyword used to measure distance in Centimeters
+    Serial.println("Yet to be Filled");
+  }
+  if((hc.dist()<20)&&(hc.dist()>60))//condition if distance is between 20cm and 60cm
+  {
+    payload += hc.dist();//hc.dist()-keyword used to measure distance in Centimeters
+    Serial.println("Atmost filled");
+  }
+  if((hc.dist()>10)&&(hc.dist()<20))
+  {
+    payload += hc.dist();//hc.dist()-keyword used to measure distance in Centimeters
+    Serial.println("half filled");
+  }
+  if(hc.dist()<10)
+  {
+    payload += hc.dist();//hc.dist()-keyword used to measure distance in Centimeters
+    Serial.println("Completely filled");
+  }
+
+payload += "}";
+Serial.print("Sending payload: ");
+Serial.println(payload);//publishing the payloads
+
+if (client.publish(publishTopic, (char *)payload.c_str()))
+{
+Serial.println("Publish ok");
+if (!!!client.connected())//checking the status of client Connection
+{
+Serial.print("Reconnecting client to ");
+Serial.println(server);
+while (!!!client.connect(clientId, authMethod, token))
+{
+Serial.print(".");
+//delay(500);
+}
+Serial.println();
+}
+}
+else
+{
+Serial.println("Publish failed");
+if (!!!client.connected())
+{
+Serial.print("Reconnecting client to ");
+Serial.println(server);
+while (!!!client.connect(clientId, authMethod, token))
+{
+Serial.print(".");
+//delay(500);
+}
+Serial.println();
+}
+}
+}
+
+void InitWiFi()//function for Wifi-Connectivity
+{
+// initialize serial for ESP module
+soft.begin(9600);
+// initialize ESP module
+WiFi.init(&soft);
+
+Serial.println("Connecting to AP …");
+// attempt to connect to WiFi network
+while ( status != WL_CONNECTED)
+{
+Serial.print("Attempting to connect to WPA SSID:");
+Serial.println(WIFI_AP);
+// Connect to WPA/WPA2 network
+status=WiFi.begin(WIFI_AP,WIFI_PASSWORD);
+delay(500);
+}
+Serial.println("Connected to AP");
+}
+
+void callback(char* publishTopic, byte* payload, unsigned int length)
+{
+Serial.println("callback invoked");
+}
